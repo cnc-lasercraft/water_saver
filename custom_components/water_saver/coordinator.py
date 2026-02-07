@@ -1,8 +1,6 @@
-import logging
-LOGGER = logging.getLogger(__name__)
-
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
@@ -15,6 +13,8 @@ from homeassistant.util import dt as dt_util
 
 from .const import CONF_NAME, CONF_TOPIC
 from .storage import PeriodState, WaterSaverStore
+
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass
@@ -43,6 +43,9 @@ class WaterSaverCoordinator:
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         self.hass = hass
         self.entry = entry
+
+        # IMPORTANT:
+        # Config values may live in entry.data (initial) or entry.options (after edits).
         self.name = entry.options.get(CONF_NAME, entry.data.get(CONF_NAME))
         self.topic = entry.options.get(CONF_TOPIC, entry.data.get(CONF_TOPIC))
 
@@ -65,8 +68,21 @@ class WaterSaverCoordinator:
     async def async_initialize(self) -> None:
         self.periods = await self.store.async_load()
 
+        LOGGER.warning(
+            "Water Saver init: subscribing to topic=%r name=%r (entry_id=%s)",
+            self.topic,
+            self.name,
+            self.entry.entry_id,
+        )
+
         @callback
         def _msg_received(msg: mqtt.ReceiveMessage) -> None:
+            # Debug: prove we receive messages
+            LOGGER.warning(
+                "Water Saver RX: topic=%r payload=%s",
+                getattr(msg, "topic", None),
+                msg.payload,
+            )
             self._handle_payload(msg.payload)
 
         self._unsub_mqtt = await mqtt.async_subscribe(
@@ -111,15 +127,19 @@ class WaterSaverCoordinator:
             import json
 
             obj: dict[str, Any] = json.loads(payload)
-        except Exception:
+        except Exception as err:
+            LOGGER.warning("Water Saver: JSON decode failed (%s). Payload=%r", err, payload)
             return
 
         # Only care about telegram payloads
-        if obj.get("_") != "telegram":
+        msg_type = obj.get("_")
+        if msg_type != "telegram":
+            LOGGER.warning("Water Saver: ignoring payload with _=%r (not 'telegram')", msg_type)
             return
 
         total_m3 = obj.get("total_m3")
         if total_m3 is None:
+            LOGGER.warning("Water Saver: telegram missing total_m3. Keys=%s", list(obj.keys()))
             return
 
         total_l = float(total_m3) * 1000.0
@@ -147,6 +167,14 @@ class WaterSaverCoordinator:
 
         # Compute period deltas
         self._update_period_deltas(total_l, now_utc)
+
+        LOGGER.warning(
+            "Water Saver: updated total_l=%.1f hour_l=%s day_l=%s (meter_id=%s)",
+            self.data.total_l,
+            self.data.hour_l,
+            self.data.day_l,
+            self.data.meter_id,
+        )
 
         self._notify()
 
@@ -181,7 +209,12 @@ class WaterSaverCoordinator:
         # Month boundary
         if self.periods.start_total_l_month is None:
             self.periods.start_total_l_month = total_l
-        if local.day == 1 and local.hour == 0 and local.minute == 0 and local.second < 10:
+        if (
+            local.day == 1
+            and local.hour == 0
+            and local.minute == 0
+            and local.second < 10
+        ):
             self.periods.start_total_l_month = total_l
 
         # Year boundary
@@ -197,18 +230,8 @@ class WaterSaverCoordinator:
             self.periods.start_total_l_year = total_l
 
         # Deltas
-        self.data.hour_l = max(
-            0.0, total_l - (self.periods.start_total_l_hour or total_l)
-        )
-        self.data.day_l = max(
-            0.0, total_l - (self.periods.start_total_l_day or total_l)
-        )
-        self.data.week_l = max(
-            0.0, total_l - (self.periods.start_total_l_week or total_l)
-        )
-        self.data.month_l = max(
-            0.0, total_l - (self.periods.start_total_l_month or total_l)
-        )
-        self.data.year_l = max(
-            0.0, total_l - (self.periods.start_total_l_year or total_l)
-        )
+        self.data.hour_l = max(0.0, total_l - (self.periods.start_total_l_hour or total_l))
+        self.data.day_l = max(0.0, total_l - (self.periods.start_total_l_day or total_l))
+        self.data.week_l = max(0.0, total_l - (self.periods.start_total_l_week or total_l))
+        self.data.month_l = max(0.0, total_l - (self.periods.start_total_l_month or total_l))
+        self.data.year_l = max(0.0, total_l - (self.periods.start_total_l_year or total_l))
