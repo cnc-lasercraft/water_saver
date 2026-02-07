@@ -1,0 +1,14 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Water Saver",
+        "description": "Liest Wasserverbrauch aus einem MQTT JSON Topic (z.B. wmbusmeters/Wasser).",
+        "data": {
+          "name": "Name",
+          "topic": "MQTT Topic"
+        }
+      }
+    }
+  }
+}
