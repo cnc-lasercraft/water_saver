@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.core import HomeAssistant, callback
@@ -10,7 +10,7 @@ from homeassistant.components import mqtt
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
 
-from .const import CONF_NAME, CONF_TOPIC, DOMAIN
+from .const import CONF_NAME, CONF_TOPIC
 from .storage import PeriodState, WaterSaverStore
 
 
@@ -72,7 +72,7 @@ class WaterSaverCoordinator:
 
         # Update "last_seen_min" every minute
         self._unsub_tick = async_track_time_interval(
-            self.hass, self._tick_last_seen, dt_util.timedelta(minutes=1)
+            self.hass, self._tick_last_seen, timedelta(minutes=1)
         )
 
     async def async_shutdown(self) -> None:
@@ -98,6 +98,7 @@ class WaterSaverCoordinator:
     def _handle_payload(self, payload: str) -> None:
         try:
             import json
+
             obj: dict[str, Any] = json.loads(payload)
         except Exception:
             return
@@ -114,7 +115,9 @@ class WaterSaverCoordinator:
         now_utc = dt_util.utcnow()
 
         self.data.total_l = total_l
-        self.data.target_l = (float(obj["target_m3"]) * 1000.0) if obj.get("target_m3") is not None else None
+        self.data.target_l = (
+            (float(obj["target_m3"]) * 1000.0) if obj.get("target_m3") is not None else None
+        )
         self.data.target_date = obj.get("target_date")
         self.data.battery_y = float(obj["battery_y"]) if obj.get("battery_y") is not None else None
         self.data.status = obj.get("status")
@@ -138,7 +141,6 @@ class WaterSaverCoordinator:
         # Hour boundary
         if self.periods.start_total_l_hour is None:
             self.periods.start_total_l_hour = total_l
-        # Detect new hour: if minute is 0 and we've moved forward (best effort)
         if local.minute == 0 and local.second < 10:
             self.periods.start_total_l_hour = total_l
 
@@ -151,23 +153,4 @@ class WaterSaverCoordinator:
         # Week boundary (Monday)
         if self.periods.start_total_l_week is None:
             self.periods.start_total_l_week = total_l
-        if local.weekday() == 0 and local.hour == 0 and local.minute == 0 and local.second < 10:
-            self.periods.start_total_l_week = total_l
-
-        # Month boundary
-        if self.periods.start_total_l_month is None:
-            self.periods.start_total_l_month = total_l
-        if local.day == 1 and local.hour == 0 and local.minute == 0 and local.second < 10:
-            self.periods.start_total_l_month = total_l
-
-        # Year boundary
-        if self.periods.start_total_l_year is None:
-            self.periods.start_total_l_year = total_l
-        if local.month == 1 and local.day == 1 and local.hour == 0 and local.minute == 0 and local.second < 10:
-            self.periods.start_total_l_year = total_l
-
-        self.data.hour_l = max(0.0, total_l - (self.periods.start_total_l_hour or total_l))
-        self.data.day_l = max(0.0, total_l - (self.periods.start_total_l_day or total_l))
-        self.data.week_l = max(0.0, total_l - (self.periods.start_total_l_week or total_l))
-        self.data.month_l = max(0.0, total_l - (self.periods.start_total_l_month or total_l))
-        self.data.year_l = max(0.0, total_l - (self.periods.start_total_l_year or total_l))
+        if local.weekday() == 0 and local.hour ==
