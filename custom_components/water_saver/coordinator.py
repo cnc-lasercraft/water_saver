@@ -20,7 +20,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 @dataclass
-class WaterData:
+class WaterSaverData:
     total_l: float | None = None
     target_l: float | None = None
     target_date: str | None = None
