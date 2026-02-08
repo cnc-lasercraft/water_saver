@@ -1,0 +1,26 @@
+template:
+  - sensor:
+      - name: "Water Saver Total (L)"
+        unique_id: water_saver_total_l
+        unit_of_measurement: "L"
+        device_class: water
+        state_class: total_increasing
+        state: >
+          {{ (states('sensor.water_saver_total_m3') | float(0) * 1000) | round(1) }}
+
+utility_meter:
+  water_saver_hour_l:
+    source: sensor.water_saver_total_l
+    cycle: hourly
+  water_saver_day_l:
+    source: sensor.water_saver_total_l
+    cycle: daily
+  water_saver_week_l:
+    source: sensor.water_saver_total_l
+    cycle: weekly
+  water_saver_month_l:
+    source: sensor.water_saver_total_l
+    cycle: monthly
+  water_saver_year_l:
+    source: sensor.water_saver_total_l
+    cycle: yearly
