@@ -3,6 +3,23 @@
 All notable changes to this project are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] - 2026-11-15
+
+### Fixed
+- **Option changes take effect immediately.** Changing the name, MQTT topic,
+  thresholds or exclusion entities in the options dialog was saved but ignored
+  until Home Assistant restarted: the topic subscription and the tracking of
+  exclusion entities are set up once at start. The entry now reloads itself
+  when its options change.
+
+### Changed
+- **One Water Saver entry per Home Assistant instance**
+  (`single_config_entry`). The setup dialog used to accept a second entry for
+  another topic, but entity unique IDs and the storage file are not
+  entry-specific — the second entry's entities were rejected and both entries
+  overwrote each other's period history. Existing single-entry installations
+  are not affected.
+
 ## [0.1.2] - 2026-09-01
 
 ### Fixed
